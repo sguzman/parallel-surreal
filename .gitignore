@@ -1,0 +1,9 @@
+/target
+*.db
+*.json
+*.csv
+*.txt
+target/
+res/
+*.lock
+.env
