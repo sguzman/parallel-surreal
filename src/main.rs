@@ -42,6 +42,10 @@ struct Cli {
     #[arg(short, long, default_value = "test")]
     db: String,
 
+    // Name of surreal table
+    #[arg(short, long)]
+    table: Option<String>,
+
     // Number of threads
     #[arg(short, long, default_value_t = 8)]
     threads: usize,
@@ -117,6 +121,27 @@ async fn main() -> surrealdb::Result<()> {
 
     println!("Goodbye, world!");
     Ok(())
+}
+
+// Task of insertion into SurrealDB a single item
+// Should initialize a new client
+// and insert the item into the index
+async fn insert_items(
+    thread_id: usize,
+    cli: &Cli,
+    name: &str,
+    item: &Vec<ArxivEntry>,
+) -> Result<TaskInfo, Error> {
+    println!(
+        "Thread {}: Inserting {} items into index {}",
+        thread_id,
+        item.len(),
+        name
+    );
+    let db = build_connection(cli).await?;
+
+    // Pass the struct directly instead of serializing it
+    db.resource(cli.)
 }
 
 // Load JSON data from a file
