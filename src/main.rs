@@ -13,6 +13,7 @@ use surrealdb::{Surreal, engine::remote::ws::Client};
 #[command(author = "Salvador Guzman")]
 #[command(version = "1.0")]
 #[command(long_about = None)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Cli {
     /// Sets a custom config file
     #[arg(short, long)]
@@ -63,7 +64,6 @@ pub struct ArxivEntry {
     pub categories: Option<String>,
     pub comments: Option<String>,
     pub doi: Option<String>,
-    pub id: u32,
     pub journal_ref: Option<String>,
     pub license: Option<String>,
     pub report_no: Option<String>,
@@ -84,9 +84,9 @@ async fn main() -> surrealdb::Result<()> {
     let cli = Cli::parse();
 
     // Print the input data
-    println!("Input: {:#?}", input);
+    println!("Arguments: {:#?}", cli);
 
-    let json_data = load_data(&path);
+    let json_data = load_data(&cli.input);
 
     // Create a vector to hold all the task handles
     let mut tasks = Vec::new();
