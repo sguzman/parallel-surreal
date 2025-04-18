@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use surrealdb::Surreal;
 use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
+use surrealdb::{Surreal, engine::remote::ws::Client};
 
 #[derive(Parser)]
 #[command(name = "Parallel Surrealdb Import")]
@@ -75,28 +75,26 @@ pub struct Version {
     pub version: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Input {
-    path: PathBuf,
-    address: String,
-    api: String,
-    index: String,
-    threads: usize,
-}
-
 #[tokio::main]
 async fn main() -> surrealdb::Result<()> {
-    // Connect to the server
-    let db = Surreal::new::<Ws>("127.0.0.1:8000").await?;
+    let cli = Cli::parse();
+
+    Ok(())
+}
+
+async fn build_connection(cli: &Cli) -> Surreal<Client> {
+    let db = Surreal::new::<Ws>("127.0.0.1:8000").await.unwrap();
 
     // Signin as a namespace, database, or root user
     db.signin(Root {
-        username: "root",
-        password: "root",
+        username: &cli.user,
+        password: &cli.password,
     })
-    .await?;
+    .await
+    .unwrap();
 
     // Select a specific namespace / database
-    db.use_ns("test").use_db("test").await?;
-    Ok(())
+    db.use_ns(&cli.ns).use_db(&cli.db).await.unwrap();
+
+    db
 }
