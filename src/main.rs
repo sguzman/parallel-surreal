@@ -87,6 +87,9 @@ async fn main() -> surrealdb::Result<()> {
     // Random table name
     let table = generate_random_string();
 
+    // Print table name
+    println!("Table name: {}", table);
+
     // Print the input data
     println!("Arguments: {:#?}", cli);
 
@@ -96,22 +99,17 @@ async fn main() -> surrealdb::Result<()> {
     let mut tasks = Vec::new();
 
     for i in 1..=cli.threads {
-        let input_clone = cli.clone();
+        let table = if cli.table.is_some() {
+            cli.table.clone().unwrap()
+        } else {
+            table.clone()
+        };
 
-        let table = table.clone();
         let slice = get_slice(json_data.clone(), i, cli.threads);
         let task = tokio::spawn(async move {
-            match insert_items(i, table, &input_clone, &index_clone, &slice).await {
-                Ok(_) => println!(
-                    "Thread {}: Inserted {} items for index: {}",
-                    i,
-                    slice.len(),
-                    index_clone
-                ),
-                Err(e) => eprintln!(
-                    "Thread {}: Failed to insert items for index {}: {}",
-                    i, index_clone, e
-                ),
+            match insert_items(i, table, &cli, &slice).await {
+                Ok(_) => println!("Thread {}: Inserted {} items", i, slice.len(),),
+                Err(e) => eprintln!("Thread {}: Failed to insert items", i,),
             }
         });
         tasks.push(task);
@@ -135,14 +133,13 @@ async fn insert_items(
     thread_id: usize,
     table: String,
     cli: &Cli,
-    name: &str,
     item: &Vec<ArxivEntry>,
 ) -> surrealdb::Result<()> {
     println!(
         "Thread {}: Inserting {} items into index {}",
         thread_id,
         item.len(),
-        name
+        table
     );
     let db = build_connection(cli).await;
 
