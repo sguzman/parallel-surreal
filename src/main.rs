@@ -119,6 +119,13 @@ async fn main() -> surrealdb::Result<()> {
     Ok(())
 }
 
+// Load JSON data from a file
+fn load_data(path: &PathBuf) -> Vec<ArxivEntry> {
+    let data = std::fs::read_to_string(path).expect("Failed to read file");
+    let data: Vec<ArxivEntry> = serde_json::from_str(&data).expect("Failed to parse JSON");
+    data
+}
+
 // Given a thread, get a slice of the data starting from the thread's index
 fn get_slice(data: Vec<ArxivEntry>, thread: usize, num_threads: usize) -> Vec<ArxivEntry> {
     let start = (thread - 1) * data.len() / num_threads;
