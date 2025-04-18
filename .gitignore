@@ -7,3 +7,5 @@ target/
 res/
 *.lock
 .env
+template/
+res/
