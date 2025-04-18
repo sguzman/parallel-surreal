@@ -79,11 +79,56 @@ pub struct Version {
 async fn main() -> surrealdb::Result<()> {
     let cli = Cli::parse();
 
+    // Print the input data
+    println!("Input: {:#?}", input);
+
+    let json_data = load_data(&path);
+
+    // Create a vector to hold all the task handles
+    let mut tasks = Vec::new();
+
+    for i in 1..=input.threads {
+        let input_clone = input.clone();
+        let index_clone = index.clone();
+        let slice = get_slice(json_data.clone(), i, input.threads);
+        let task = tokio::spawn(async move {
+            match insert_items(i, &input_clone, &index_clone, &slice).await {
+                Ok(_) => println!(
+                    "Thread {}: Inserted {} items for index: {}",
+                    i,
+                    slice.len(),
+                    index_clone
+                ),
+                Err(e) => eprintln!(
+                    "Thread {}: Failed to insert items for index {}: {}",
+                    i, index_clone, e
+                ),
+            }
+        });
+        tasks.push(task);
+    }
+
+    // Wait for all tasks to complete
+    for task in tasks {
+        if let Err(e) = task.await {
+            eprintln!("Task failed: {}", e);
+        }
+    }
+
+    println!("Goodbye, world!");
     Ok(())
 }
 
+// Given a thread, get a slice of the data starting from the thread's index
+fn get_slice(data: Vec<ArxivEntry>, thread: usize, num_threads: usize) -> Vec<ArxivEntry> {
+    let start = (thread - 1) * data.len() / num_threads;
+    let end = thread * data.len() / num_threads;
+    data[start..end].to_vec()
+}
+
 async fn build_connection(cli: &Cli) -> Surreal<Client> {
-    let db = Surreal::new::<Ws>("127.0.0.1:8000").await.unwrap();
+    let address = format!("ws://{}:{}", cli.host, cli.port);
+    let db = Surreal::new::<Ws>(address).await.unwrap();
 
     // Signin as a namespace, database, or root user
     db.signin(Root {
