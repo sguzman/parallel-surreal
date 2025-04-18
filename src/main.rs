@@ -65,6 +65,7 @@ pub struct ArxivEntry {
     pub categories: Option<String>,
     pub comments: Option<String>,
     pub doi: Option<String>,
+    pub id: u32,
     pub journal_ref: Option<String>,
     pub license: Option<String>,
     pub report_no: Option<String>,
@@ -97,19 +98,22 @@ async fn main() -> surrealdb::Result<()> {
 
     // Create a vector to hold all the task handles
     let mut tasks = Vec::new();
+    let num_threads = cli.threads.clone();
+    let table = if cli.table.is_some() {
+        cli.table.clone().unwrap()
+    } else {
+        table
+    };
 
     for i in 1..=cli.threads {
-        let table = if cli.table.is_some() {
-            cli.table.clone().unwrap()
-        } else {
-            table.clone()
-        };
+        let table = table.clone();
+        let cli = cli.clone();
 
-        let slice = get_slice(json_data.clone(), i, cli.threads);
+        let slice = get_slice(json_data.clone(), i, num_threads);
         let task = tokio::spawn(async move {
-            match insert_items(i, table, &cli, &slice).await {
+            match insert_items(i, table.clone(), &cli, &slice).await {
                 Ok(_) => println!("Thread {}: Inserted {} items", i, slice.len(),),
-                Err(e) => eprintln!("Thread {}: Failed to insert items", i,),
+                Err(e) => eprintln!("Thread {}: Failed to insert items: {}", i, e),
             }
         });
         tasks.push(task);
@@ -134,7 +138,7 @@ async fn insert_items(
     table: String,
     cli: &Cli,
     item: &Vec<ArxivEntry>,
-) -> surrealdb::Result<()> {
+) -> Result<(), surrealdb::Error> {
     println!(
         "Thread {}: Inserting {} items into index {}",
         thread_id,
@@ -143,8 +147,11 @@ async fn insert_items(
     );
     let db = build_connection(cli).await;
 
-    // Pass the struct directly instead of serializing it
-    db.resource(table).content(&item).await?;
+    db.insert::<Vec<ArxivEntry>>(table)
+        .content(item.clone())
+        .await
+        .unwrap();
+
     Ok(())
 }
 
