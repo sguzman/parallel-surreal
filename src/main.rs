@@ -47,6 +47,43 @@ struct Cli {
     threads: usize,
 }
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ArxivEntry {
+    // Since abstract is a reserved word in Rust, we use `abstract_text` instead
+    #[serde(rename = "abstract")]
+    pub abstract_text: Option<String>,
+    pub authors: Option<String>,
+    pub authors_parsed: Vec<Vec<String>>,
+    pub categories: Option<String>,
+    pub comments: Option<String>,
+    pub doi: Option<String>,
+    pub id: u32,
+    pub journal_ref: Option<String>,
+    pub license: Option<String>,
+    pub report_no: Option<String>,
+    pub submitter: Option<String>,
+    pub title: Option<String>,
+    pub update_date: Option<String>,
+    pub versions: Vec<Version>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Version {
+    pub created: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct Input {
+    path: PathBuf,
+    address: String,
+    api: String,
+    index: String,
+    threads: usize,
+}
+
 #[tokio::main]
 async fn main() -> surrealdb::Result<()> {
     // Connect to the server
