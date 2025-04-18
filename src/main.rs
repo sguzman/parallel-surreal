@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
+use rand::Rng;
 use surrealdb::engine::remote::ws::Ws;
 use surrealdb::opt::auth::Root;
 use surrealdb::{Surreal, engine::remote::ws::Client};
@@ -83,6 +84,9 @@ pub struct Version {
 async fn main() -> surrealdb::Result<()> {
     let cli = Cli::parse();
 
+    // Random table name
+    let table = generate_random_string();
+
     // Print the input data
     println!("Arguments: {:#?}", cli);
 
@@ -91,12 +95,13 @@ async fn main() -> surrealdb::Result<()> {
     // Create a vector to hold all the task handles
     let mut tasks = Vec::new();
 
-    for i in 1..=input.threads {
-        let input_clone = input.clone();
-        let index_clone = index.clone();
-        let slice = get_slice(json_data.clone(), i, input.threads);
+    for i in 1..=cli.threads {
+        let input_clone = cli.clone();
+
+        let table = table.clone();
+        let slice = get_slice(json_data.clone(), i, cli.threads);
         let task = tokio::spawn(async move {
-            match insert_items(i, &input_clone, &index_clone, &slice).await {
+            match insert_items(i, table, &input_clone, &index_clone, &slice).await {
                 Ok(_) => println!(
                     "Thread {}: Inserted {} items for index: {}",
                     i,
@@ -128,20 +133,22 @@ async fn main() -> surrealdb::Result<()> {
 // and insert the item into the index
 async fn insert_items(
     thread_id: usize,
+    table: String,
     cli: &Cli,
     name: &str,
     item: &Vec<ArxivEntry>,
-) -> Result<TaskInfo, Error> {
+) -> surrealdb::Result<()> {
     println!(
         "Thread {}: Inserting {} items into index {}",
         thread_id,
         item.len(),
         name
     );
-    let db = build_connection(cli).await?;
+    let db = build_connection(cli).await;
 
     // Pass the struct directly instead of serializing it
-    db.resource(cli.)
+    db.resource(table).content(&item).await?;
+    Ok(())
 }
 
 // Generate a random 5 letter string
