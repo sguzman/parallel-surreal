@@ -144,6 +144,18 @@ async fn insert_items(
     db.resource(cli.)
 }
 
+// Generate a random 5 letter string
+fn generate_random_string() -> String {
+    let chars = "abcdefghijklmnopqrstuvwxyz";
+    let random_string: String = (0..5)
+        .map(|_| {
+            let idx = rand::rng().random_range(0..chars.len());
+            chars.chars().nth(idx).unwrap()
+        })
+        .collect();
+    random_string
+}
+
 // Load JSON data from a file
 fn load_data(path: &PathBuf) -> Vec<ArxivEntry> {
     let data = std::fs::read_to_string(path).expect("Failed to read file");
