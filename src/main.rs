@@ -17,39 +17,39 @@ use surrealdb::{Surreal, engine::remote::ws::Client};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Cli {
     /// Sets a custom config file
-    #[arg(short, long)]
+    #[arg(long)]
     input: PathBuf,
 
     // Name of surreal user
-    #[arg(short, long, default_value = "root")]
+    #[arg(long, default_value = "root")]
     user: String,
 
     // Password for surreal user
-    #[arg(short, long, default_value = "root")]
+    #[arg(long, default_value = "root")]
     password: String,
 
     // Name of surreal host
-    #[arg(short, long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = "127.0.0.1")]
     host: String,
 
     // Port of surreal host
-    #[arg(short, long, default_value = "8000")]
+    #[arg(long, default_value = "8000")]
     port: String,
 
     // Name of surreal namespace
-    #[arg(short, long, default_value = "test")]
+    #[arg(long, default_value = "test")]
     ns: String,
 
     // Name of surreal database
-    #[arg(short, long, default_value = "test")]
+    #[arg(long, default_value = "test")]
     db: String,
 
     // Name of surreal table
-    #[arg(short, long)]
+    #[arg(long)]
     table: Option<String>,
 
     // Number of threads
-    #[arg(short, long, default_value_t = 8)]
+    #[arg(long, default_value_t = 1)]
     threads: usize,
 }
 
@@ -139,6 +139,12 @@ async fn insert_items(
     cli: &Cli,
     item: &Vec<ArxivEntry>,
 ) -> Result<(), surrealdb::Error> {
+    // If 0 items, return
+    if item.len() == 0 {
+        println!("Thread {}: No items to insert", thread_id);
+        return Ok(());
+    }
+
     println!(
         "Thread {}: Inserting {} items into index {}",
         thread_id,
@@ -182,7 +188,7 @@ fn get_slice(data: Vec<ArxivEntry>, thread: usize, num_threads: usize) -> Vec<Ar
 }
 
 async fn build_connection(cli: &Cli) -> Surreal<Client> {
-    let address = format!("ws://{}:{}", cli.host, cli.port);
+    let address = format!("{}:{}", cli.host, cli.port);
     let db = Surreal::new::<Ws>(address).await.unwrap();
 
     // Signin as a namespace, database, or root user
