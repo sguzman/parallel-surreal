@@ -51,6 +51,10 @@ struct Cli {
     // Number of threads
     #[arg(long, default_value_t = 8)]
     threads: usize,
+
+    // Size of the chunk
+    #[arg(long, default_value_t = 1000)]
+    chunk_size: usize,
 }
 
 use serde::{Deserialize, Serialize};
@@ -181,41 +185,56 @@ async fn insert_items(
     thread_id: usize,
     table: String,
     cli: &Cli,
-    item: &Vec<ArxivEntry>,
+    items: &Vec<ArxivEntry>, // Renamed for clarity
 ) -> Result<(), surrealdb::Error> {
-    if item.is_empty() {
-        // Use is_empty() for clarity
+    if items.is_empty() {
         println!("Thread {}: No items to insert", thread_id);
         return Ok(());
     }
 
-    // Convert the Vec<ArxivEntry> to Vec<ArxivEntry2>
-    let item: Vec<ArxivEntry2> = item.iter().map(|e| e.clone().into()).collect();
+    // Convert the items to the new struct
+    let items: Vec<ArxivEntry2> = items.iter().map(|item| item.clone().into()).collect();
 
-    println!(
-        "Thread {}: Inserting {} items into index {}",
-        thread_id,
-        item.len(),
-        table
-    );
-    let db = build_connection(cli).await; // Use ? to propagate potential connection errors
+    // --- Start Modification ---
+    let db = build_connection(cli).await;
+    let chunk_size = cli.chunk_size; // Adjust this value based on testing (start smaller, e.g., 100, 500, 1000)
 
-    // Match the result instead of unwrapping
-    match db
-        .insert::<Vec<ArxivEntry2>>(table)
-        .content(item.clone())
-        .await
-    {
-        Ok(_) => {
-            // Optional: Log success if needed
-            // println!("Thread {}: Successfully inserted {} items", thread_id, item.len());
-            Ok(())
+    for (i, chunk) in items.chunks(chunk_size).enumerate() {
+        println!(
+            "Thread {}: Inserting chunk {}/{} ({} items)",
+            thread_id,
+            i + 1,
+            (items.len() + chunk_size - 1) / chunk_size, // Calculate total chunks
+            chunk.len()
+        );
+
+        match db
+            .insert::<Vec<ArxivEntry>>(&table) // Pass table name as reference
+            .content(chunk.to_vec()) // Send only the current chunk
+            .await
+        {
+            Ok(_) => {
+                // Optional: Success log per chunk if needed
+            }
+            Err(e) => {
+                // Log the specific chunk that failed
+                eprintln!(
+                    "Thread {}: Failed insertion on chunk {}: {}",
+                    thread_id,
+                    i + 1,
+                    e
+                );
+                // Decide if you want to stop the thread on first error or continue
+                return Err(e); // Stop and propagate error
+            }
         }
-        Err(e) => {
-            eprintln!("Thread {}: Failed insertion: {}", thread_id, e);
-            Err(e) // Propagate the error
-        }
+        // Optional: Add a small delay between chunks if needed, e.g., for rate limiting
+        // tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
+    // --- End Modification ---
+
+    println!("Thread {}: Finished inserting all chunks", thread_id);
+    Ok(())
 }
 
 // Generate a random 5 letter string
