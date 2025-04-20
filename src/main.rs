@@ -137,6 +137,9 @@ async fn main() -> surrealdb::Result<()> {
 
     let json_data = load_data(&cli.input);
 
+    // Print the number of items to be inserted
+    println!("Number of items to be inserted: {}", json_data.len());
+
     // Create a vector to hold all the task handles
     let mut tasks = Vec::new();
     let num_threads = cli.threads.clone();
