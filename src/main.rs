@@ -49,7 +49,7 @@ struct Cli {
     table: Option<String>,
 
     // Number of threads
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 8)]
     threads: usize,
 }
 
@@ -75,13 +75,54 @@ pub struct ArxivEntry {
     pub versions: Vec<Version>,
 }
 
+// ArxivEntry struct without the id field
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ArxivEntry2 {
+    // Since abstract is a reserved word in Rust, we use `abstract_text` instead
+    #[serde(rename = "abstract")]
+    pub abstract_text: Option<String>,
+    pub authors: Option<String>,
+    pub authors_parsed: Vec<Vec<String>>,
+    pub categories: Option<String>,
+    pub comments: Option<String>,
+    pub doi: Option<String>,
+    pub journal_ref: Option<String>,
+    pub license: Option<String>,
+    pub report_no: Option<String>,
+    pub submitter: Option<String>,
+    pub title: Option<String>,
+    pub update_date: Option<String>,
+    pub versions: Vec<Version>,
+}
+
+// Map the ArxivEntry struct to the ArxivEntry2 struct
+impl From<ArxivEntry> for ArxivEntry2 {
+    fn from(entry: ArxivEntry) -> Self {
+        ArxivEntry2 {
+            abstract_text: entry.abstract_text,
+            authors: entry.authors,
+            authors_parsed: entry.authors_parsed,
+            categories: entry.categories,
+            comments: entry.comments,
+            doi: entry.doi,
+            journal_ref: entry.journal_ref,
+            license: entry.license,
+            report_no: entry.report_no,
+            submitter: entry.submitter,
+            title: entry.title,
+            update_date: entry.update_date,
+            versions: entry.versions,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Version {
     pub created: String,
     pub version: String,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> surrealdb::Result<()> {
     let cli = Cli::parse();
 
@@ -112,7 +153,7 @@ async fn main() -> surrealdb::Result<()> {
         let slice = get_slice(json_data.clone(), i, num_threads);
         let task = tokio::spawn(async move {
             match insert_items(i, table.clone(), &cli, &slice).await {
-                Ok(_) => println!("Thread {}: Inserted {} items", i, slice.len(),),
+                Ok(_) => println!("Thread {}: Done", i),
                 Err(e) => eprintln!("Thread {}: Failed to insert items: {}", i, e),
             }
         });
@@ -139,11 +180,14 @@ async fn insert_items(
     cli: &Cli,
     item: &Vec<ArxivEntry>,
 ) -> Result<(), surrealdb::Error> {
-    // If 0 items, return
-    if item.len() == 0 {
+    if item.is_empty() {
+        // Use is_empty() for clarity
         println!("Thread {}: No items to insert", thread_id);
         return Ok(());
     }
+
+    // Convert the Vec<ArxivEntry> to Vec<ArxivEntry2>
+    let item: Vec<ArxivEntry2> = item.iter().map(|e| e.clone().into()).collect();
 
     println!(
         "Thread {}: Inserting {} items into index {}",
@@ -151,14 +195,24 @@ async fn insert_items(
         item.len(),
         table
     );
-    let db = build_connection(cli).await;
+    let db = build_connection(cli).await; // Use ? to propagate potential connection errors
 
-    db.insert::<Vec<ArxivEntry>>(table)
+    // Match the result instead of unwrapping
+    match db
+        .insert::<Vec<ArxivEntry2>>(table)
         .content(item.clone())
         .await
-        .unwrap();
-
-    Ok(())
+    {
+        Ok(_) => {
+            // Optional: Log success if needed
+            // println!("Thread {}: Successfully inserted {} items", thread_id, item.len());
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("Thread {}: Failed insertion: {}", thread_id, e);
+            Err(e) // Propagate the error
+        }
+    }
 }
 
 // Generate a random 5 letter string
