@@ -209,7 +209,7 @@ async fn insert_items(
         );
 
         match db
-            .insert::<Vec<ArxivEntry>>(&table) // Pass table name as reference
+            .insert::<Vec<ArxivEntry2>>(&table) // Pass table name as reference
             .content(chunk.to_vec()) // Send only the current chunk
             .await
         {
